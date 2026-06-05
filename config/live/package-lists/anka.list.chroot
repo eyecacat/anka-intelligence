@@ -1,0 +1,15 @@
+live-boot
+live-config
+systemd
+python3
+ca-certificates
+curl
+chromium
+xserver-xorg-core
+xserver-xorg-input-all
+xserver-xorg-video-all
+xinit
+dbus-x11
+openbox
+fonts-dejavu
+fonts-noto-color-emoji
