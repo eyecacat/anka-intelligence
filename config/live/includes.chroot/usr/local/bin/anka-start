@@ -1,0 +1,23 @@
+#!/bin/sh
+set -e
+
+export HOME=/home/anka
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/anka-runtime}"
+export DISPLAY=:0
+
+mkdir -p "$XDG_RUNTIME_DIR" "$HOME/.config/chromium"
+chmod 0700 "$XDG_RUNTIME_DIR"
+
+while ! curl -fsS http://127.0.0.1:7700/health >/dev/null 2>&1; do
+  sleep 1
+done
+
+exec xinit /usr/bin/chromium \
+  --kiosk \
+  --no-first-run \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-features=TranslateUI \
+  --user-data-dir="$HOME/.config/chromium" \
+  file:///opt/anka/shell/index.html \
+  -- :0 vt7 -nolisten tcp
