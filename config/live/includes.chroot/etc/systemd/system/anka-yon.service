@@ -1,0 +1,15 @@
+[Unit]
+Description=Anka Intelligence YON API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/anka/yon/yon_core.py
+Restart=always
+RestartSec=3
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target
