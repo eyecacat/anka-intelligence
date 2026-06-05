@@ -1,0 +1,63 @@
+name: Build Anka Intelligence ISO
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 90
+
+    steps:
+      - name: Repoyu cek
+        uses: actions/checkout@v4
+
+      - name: Bagimliliklari kur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            live-build \
+            debootstrap \
+            squashfs-tools \
+            xorriso \
+            isolinux \
+            syslinux-common
+
+      - name: live-build yapilandir
+        run: |
+          mkdir -p build
+          cd build
+          lb config \
+            --distribution bookworm \
+            --architectures amd64 \
+            --binary-images iso-hybrid \
+            --bootappend-live "boot=live components quiet splash" \
+            --iso-volume "AnkaIntelligence" \
+            --iso-publisher "Anka Intelligence OS" \
+            --memtest none \
+            --debian-installer none
+          cp -r ../config/live/* config/
+
+      - name: ISOyu derle
+        run: |
+          cd build
+          sudo lb build 2>&1 | tee build.log
+          ls -lh *.iso
+
+      - name: ISOyu artifact olarak yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: anka-intelligence-iso
+          path: build/*.iso
+          retention-days: 30
+
+      - name: Release olustur
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/*.iso
+          token: ${{ secrets.GITHUB_TOKEN }}
