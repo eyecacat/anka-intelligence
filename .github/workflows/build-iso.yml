@@ -54,6 +54,7 @@ jobs:
             --memtest none \
             --debian-installer none
           cp -r ../config/live/* config/
+          find config -type f -exec sed -i 's/bookworm\/updates/bookworm-security/g' {} +
 
       - name: ISOyu derle
         run: |
