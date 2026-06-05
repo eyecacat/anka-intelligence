@@ -1,0 +1,24 @@
+{
+  "openrouter": {
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "openai/gpt-4o",
+    "app_name": "Anka Intelligence OS",
+    "site_url": "https://github.com/anka-intelligence/anka-intelligence",
+    "api_keys": [
+      "OPENROUTER_API_KEY_01",
+      "OPENROUTER_API_KEY_02",
+      "OPENROUTER_API_KEY_03",
+      "OPENROUTER_API_KEY_04",
+      "OPENROUTER_API_KEY_05",
+      "OPENROUTER_API_KEY_06",
+      "OPENROUTER_API_KEY_07",
+      "OPENROUTER_API_KEY_08",
+      "OPENROUTER_API_KEY_09",
+      "OPENROUTER_API_KEY_10"
+    ]
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "port": 7700
+  }
+}
