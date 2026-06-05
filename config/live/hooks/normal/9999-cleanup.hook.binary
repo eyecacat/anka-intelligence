@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+
+echo "Anka Intelligence ISO temizligi yapiliyor..."
+rm -f binary/live/filesystem.packages-remove 2>/dev/null || true
+find . -name ".DS_Store" -delete 2>/dev/null || true
