@@ -1,0 +1,35 @@
+#!/bin/sh
+set -e
+
+echo "Anka Intelligence OS kurulumu baslatiliyor..."
+
+if ! id anka >/dev/null 2>&1; then
+  useradd -m -s /bin/bash -G audio,video,netdev,plugdev anka
+fi
+
+passwd -d anka || true
+
+install -d -m 0755 /etc/systemd/system/getty@tty1.service.d
+cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
+[Service]
+ExecStart=
+ExecStart=-/sbin/agetty --autologin anka --noclear %I $TERM
+Type=idle
+EOF
+
+install -d -m 0755 /etc/X11
+cat > /etc/X11/Xwrapper.config <<'EOF'
+allowed_users=anybody
+needs_root_rights=yes
+EOF
+
+install -d -o anka -g anka -m 0755 /home/anka/.config/chromium
+chown -R anka:anka /home/anka
+
+chmod 0755 /usr/local/bin/anka-start
+chmod 0755 /opt/anka/yon/yon_core.py
+
+systemctl enable anka-yon.service
+systemctl enable anka-shell.service
+
+echo "Anka Intelligence OS kurulumu tamamlandi."
