@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anka Intelligence</title>
+    <link rel="stylesheet" href="./style.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">A</div>
+          <div>
+            <h1>Anka Intelligence</h1>
+            <p>YON Ajan Konsolu</p>
+          </div>
+        </div>
+        <nav class="agent-list" id="agentList" aria-label="Ajanlar"></nav>
+      </aside>
+
+      <main class="chat-panel">
+        <header class="chat-header">
+          <div>
+            <p class="eyebrow">Aktif ajan</p>
+            <h2 id="agentName">Yukleniyor</h2>
+            <p id="agentRole">Ajan bilgileri aliniyor.</p>
+          </div>
+          <div class="status" id="connectionStatus">Baglaniyor</div>
+        </header>
+
+        <section class="messages" id="messages" aria-live="polite"></section>
+
+        <form class="composer" id="composer">
+          <textarea
+            id="messageInput"
+            rows="1"
+            placeholder="Mesajinizi yazin..."
+            autocomplete="off"
+          ></textarea>
+          <button id="sendButton" type="submit">Gonder</button>
+        </form>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
