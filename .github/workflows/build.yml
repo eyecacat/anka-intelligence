@@ -1,3 +1,12 @@
+<<<<<<< HEAD
+=======
+name: Build Anka Intelligence ISO
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+>>>>>>> ab29af2 (fix: enforce debian mode in build script and isolate build in docker)
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -6,6 +15,7 @@ jobs:
 
       - name: Build ISO inside Debian Docker Container
         run: |
+<<<<<<< HEAD
           docker run --rm --privileged \
             -v "$PWD":/work \
             -w /work \
@@ -14,3 +24,15 @@ jobs:
               apt-get update && apt-get install -y live-build debootstrap debian-archive-keyring ca-certificates squashfs-tools xorriso isolinux syslinux-common
               bash build.sh
             "
+=======
+          docker run --rm --privileged             -v "$PWD":/work             -w /work             debian:bookworm             bash -c "
+              apt-get update && apt-get install -y live-build debootstrap debian-archive-keyring ca-certificates squashfs-tools xorriso isolinux syslinux-common
+              bash build.sh
+            "
+
+      - name: Upload ISO to Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: build/*.iso
+>>>>>>> ab29af2 (fix: enforce debian mode in build script and isolate build in docker)

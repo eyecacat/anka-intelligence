@@ -1,19 +1,15 @@
-#!/bin/bash
-set -e
+#!/bin/sh
 
-echo "[ANKA] Servis aktivasyonu başlatılıyor..."
+# 1. Kullanıcıyı oluştur (Eğer yoksa)
+if ! id "anka" &>/dev/null; then
+    useradd -m -s /bin/bash anka
+    echo "[HOOK] 'anka' kullanıcısı oluşturuldu."
+fi
 
-# Flask'ın /shell/ route'u üzerinden index.html servis etmesi için
-# static klasörünü yon_core'un yanına sembolik link ile bağla
-ln -sf /opt/anka/shell /opt/anka/yon/shell
+# 2. Şimdi yetkileri ver
+chown -R anka:anka /opt/anka
 
-# Servisleri etkinleştir (boot'ta otomatik başlar)
+# 3. Servisleri enable et
 systemctl enable yon-core.service
 systemctl enable anka-kiosk.service
 systemctl enable anka-watchdog.service
-
-# anka kullanıcısı için gerekli dizinler
-mkdir -p /home/anka
-chown anka:anka /home/anka
-
-echo "[ANKA] Servisler etkinleştirildi: yon-core, anka-kiosk, anka-watchdog"
