@@ -18,8 +18,6 @@ python3-flask
 python3-flask-cors
 
 # Sanal Makine Desteği (VirtualBox)
-virtualbox-guest-x11
-virtualbox-guest-utils
 
 # Yardımcı
 fonts-noto
