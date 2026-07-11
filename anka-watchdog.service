@@ -1,0 +1,12 @@
+[Unit]
+Description=Anka Watchdog Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/anka-watchdog
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
