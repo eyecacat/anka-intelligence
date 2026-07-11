@@ -1,0 +1,87 @@
+name: Anka OS — ISO Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'config/**'
+      - 'build.sh'
+      - '.github/workflows/build.yml'
+  workflow_dispatch:
+    inputs:
+      clean_build:
+        description: 'Önceki build cache temizlensin mi?'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  build-iso:
+    name: Build Debian Live ISO
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sistem bilgisi
+        run: |
+          echo "Runner: $(uname -a)"
+          echo "Disk  : $(df -h / | tail -1)"
+          echo "RAM   : $(free -h | grep Mem)"
+
+      - name: live-build kur
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends \
+            live-build \
+            wget \
+            curl \
+            rsync \
+            xorriso \
+            isolinux \
+            syslinux-common
+
+      - name: Build cache temizle (opsiyonel)
+        if: github.event.inputs.clean_build == 'true'
+        run: sudo rm -rf .build-cache
+
+      - name: ISO Build
+        run: sudo bash build.sh
+
+      - name: ISO bilgisi
+        run: |
+          ls -lh output/*.iso
+          echo "SHA256:"
+          sha256sum output/*.iso | tee output/SHA256SUMS
+
+      - name: ISO artifact olarak yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: anka-intelligence-os-${{ github.run_number }}
+          path: |
+            output/*.iso
+            output/SHA256SUMS
+            output/build.log
+          retention-days: 7
+
+      - name: Release oluştur (sadece tag push'ta)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            output/*.iso
+            output/SHA256SUMS
+          body: |
+            ## Anka Intelligence OS ${{ github.ref_name }}
+
+            ### Kurulum
+            ```bash
+            sudo dd if=anka-intelligence-os-*.iso of=/dev/sdX bs=4M status=progress
+            ```
+
+            ### SHA256
+            Dosyayı doğrulamak için `SHA256SUMS` dosyasını kullanın.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,27 @@
+[Unit]
+Description=Anka Intelligence OS — Yön Core Backend
+Documentation=https://github.com/eyecacat/anka-intelligence
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=anka
+Group=anka
+WorkingDirectory=/opt/anka/yon
+ExecStart=/usr/bin/python3 /opt/anka/yon/yon_core.py
+Restart=always
+RestartSec=3
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=yon-core
+
+# Güvenlik kısıtlamaları
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/tmp
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

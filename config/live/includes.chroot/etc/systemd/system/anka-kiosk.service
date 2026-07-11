@@ -1,0 +1,42 @@
+[Unit]
+Description=Anka Intelligence OS — Chromium Kiosk
+After=yon-core.service graphical.target
+Requires=yon-core.service
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=anka
+Group=anka
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=/home/anka/.Xauthority
+
+# Backend hazır olana kadar bekle (max 15sn)
+ExecStartPre=/bin/bash -c '\
+  for i in $(seq 1 15); do \
+    curl -sf http://127.0.0.1:5050/api/health && exit 0; \
+    sleep 1; \
+  done; \
+  echo "YON CORE timeout"; exit 1'
+
+ExecStart=/usr/bin/chromium \
+  --kiosk \
+  --no-sandbox \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-restore-session-state \
+  --noerrdialogs \
+  --disable-translate \
+  --disable-features=TranslateUI \
+  --disable-pinch \
+  --overscroll-history-navigation=0 \
+  --disable-back-forward-cache \
+  --autoplay-policy=no-user-gesture-required \
+  --check-for-update-interval=31536000 \
+  --app=http://127.0.0.1:5050/shell/index.html
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

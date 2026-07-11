@@ -1,0 +1,35 @@
+[Unit]
+Description=Anka Intelligence OS — Kiosk Watchdog
+After=anka-kiosk.service
+Requires=anka-kiosk.service
+
+[Service]
+Type=simple
+User=root
+
+# Her 10 saniyede Chromium ve backend sağlık kontrolü yapar.
+# Biri ölmüşse ilgili servisi yeniden başlatır.
+ExecStart=/bin/bash -c '\
+  while true; do \
+    sleep 10; \
+    \
+    if ! curl -sf http://127.0.0.1:5050/api/health > /dev/null 2>&1; then \
+      echo "[watchdog] yon-core yanıt vermiyor, yeniden başlatılıyor..."; \
+      systemctl restart yon-core.service; \
+      sleep 5; \
+    fi; \
+    \
+    if ! pgrep -x chromium > /dev/null 2>&1; then \
+      echo "[watchdog] Chromium çalışmıyor, yeniden başlatılıyor..."; \
+      systemctl restart anka-kiosk.service; \
+    fi; \
+  done'
+
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=anka-watchdog
+
+[Install]
+WantedBy=multi-user.target
