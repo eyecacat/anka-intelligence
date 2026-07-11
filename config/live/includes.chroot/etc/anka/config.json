@@ -1,24 +1,24 @@
 {
-  "openrouter": {
-    "base_url": "https://openrouter.ai/api/v1/chat/completions",
-    "model": "openai/gpt-4o",
-    "app_name": "Anka Intelligence OS",
-    "site_url": "https://github.com/anka-intelligence/anka-intelligence",
-    "api_keys": [
-      "OPENROUTER_API_KEY_01",
-      "OPENROUTER_API_KEY_02",
-      "OPENROUTER_API_KEY_03",
-      "OPENROUTER_API_KEY_04",
-      "OPENROUTER_API_KEY_05",
-      "OPENROUTER_API_KEY_06",
-      "OPENROUTER_API_KEY_07",
-      "OPENROUTER_API_KEY_08",
-      "OPENROUTER_API_KEY_09",
-      "OPENROUTER_API_KEY_10"
-    ]
-  },
   "server": {
     "host": "127.0.0.1",
-    "port": 7700
-  }
+    "port": 5050,
+    "debug": false
+  },
+  "openrouter": {
+    "base_url": "https://openrouter.ai/api/v1/chat/completions",
+    "site_url": "https://anka-os.local",
+    "site_name": "Anka Intelligence OS"
+  },
+  "agents": [
+    { "id": "genel",     "name": "Genel Asistan",    "model": "openai/gpt-4o-mini" },
+    { "id": "kod",       "name": "Kod Uzmanı",        "model": "anthropic/claude-3-haiku" },
+    { "id": "analiz",    "name": "Veri Analisti",     "model": "openai/gpt-4o" },
+    { "id": "hukuk",     "name": "Hukuk Asistanı",   "model": "anthropic/claude-3-haiku" },
+    { "id": "finans",    "name": "Finans Asistanı",  "model": "openai/gpt-4o-mini" },
+    { "id": "saglik",    "name": "Sağlık Rehberi",   "model": "openai/gpt-4o-mini" },
+    { "id": "egitim",    "name": "Eğitim Koçu",      "model": "anthropic/claude-3-haiku" },
+    { "id": "ik",        "name": "İK Asistanı",      "model": "openai/gpt-4o-mini" },
+    { "id": "pazarlama", "name": "Pazarlama Uzmanı", "model": "openai/gpt-4o-mini" },
+    { "id": "teknik",    "name": "Teknik Destek",    "model": "openai/gpt-4o" }
+  ]
 }

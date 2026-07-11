@@ -1,210 +1,174 @@
 #!/usr/bin/env python3
+"""
+Anka Intelligence OS — Yön Core Backend
+API key'ler config.json'da TUTULMAZ.
+Her istek için key, HTTP header üzerinden alınır.
+"""
+
 import json
 import logging
-import threading
-import urllib.error
-import urllib.request
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+import os
+import requests
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
-BASE_DIR = Path("/opt/anka/yon")
-CONFIG_PATH = Path("/etc/anka/config.json")
-AGENTS_PATH = BASE_DIR / "agents.json"
-
-FALLBACK_CONFIG = {
-    "openrouter": {
-        "base_url": "https://openrouter.ai/api/v1/chat/completions",
-        "model": "openai/gpt-4o",
-        "app_name": "Anka Intelligence OS",
-        "site_url": "http://localhost:7700",
-        "api_keys": [],
-    },
-    "server": {"host": "127.0.0.1", "port": 7700},
-}
-
+# ── Logging ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s %(levelname)s %(message)s",
+    format="%(asctime)s [%(levelname)s] %(message)s"
 )
+log = logging.getLogger("yon_core")
+
+# ── Config ───────────────────────────────────────────────────────────────────
+CONFIG_PATH = "/etc/anka/config.json"
+
+def load_config() -> dict:
+    with open(CONFIG_PATH, "r") as f:
+        return json.load(f)
+
+CONFIG = load_config()
+
+# ── Flask ─────────────────────────────────────────────────────────────────────
+app = Flask(__name__)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _extract_key(req) -> str | None:
+    """
+    Header'dan API key'i çıkar.
+    Önce X-Anka-License-Key, sonra Authorization: Bearer <key> dener.
+    """
+    key = req.headers.get("X-Anka-License-Key")
+    if key:
+        return key.strip()
+
+    auth = req.headers.get("Authorization", "")
+    if auth.lower().startswith("bearer "):
+        return auth[7:].strip()
+
+    return None
 
 
-def load_json(path, fallback):
-    try:
-        with path.open("r", encoding="utf-8") as file:
-            return json.load(file)
-    except FileNotFoundError:
-        logging.warning("%s bulunamadi, varsayilan degerler kullaniliyor.", path)
-        return fallback
-    except json.JSONDecodeError as exc:
-        logging.error("%s okunamadi: %s", path, exc)
-        return fallback
+def _get_agent_model(agent_id: str) -> str:
+    for agent in CONFIG["agents"]:
+        if agent["id"] == agent_id:
+            return agent["model"]
+    return CONFIG["agents"][0]["model"]
 
 
-CONFIG = load_json(CONFIG_PATH, FALLBACK_CONFIG)
-AGENTS = load_json(AGENTS_PATH, [])
-AGENT_MAP = {agent["id"]: agent for agent in AGENTS}
+# ── Routes ───────────────────────────────────────────────────────────────────
 
-key_lock = threading.Lock()
-key_index = 0
+@app.route("/api/health", methods=["GET"])
+def health():
+    return jsonify({"status": "ok", "service": "yon_core"}), 200
 
 
-def public_agent(agent):
-    return {
-        "id": agent["id"],
-        "name": agent["name"],
-        "role": agent["role"],
+@app.route("/api/agents", methods=["GET"])
+def agents():
+    return jsonify({"agents": CONFIG["agents"]}), 200
+
+
+@app.route("/api/chat", methods=["POST"])
+def chat():
+    # 1. Key kontrolü
+    api_key = _extract_key(request)
+    if not api_key:
+        log.warning("İstek geldi ancak API key eksik.")
+        return jsonify({
+            "error": "unauthorized",
+            "message": "Lisans anahtarı bulunamadı. Lütfen geçerli bir anahtar girin."
+        }), 401
+
+    # 2. Body doğrulama
+    body = request.get_json(silent=True) or {}
+    messages  = body.get("messages")
+    agent_id  = body.get("agent_id", "genel")
+
+    if not messages or not isinstance(messages, list):
+        return jsonify({
+            "error": "bad_request",
+            "message": "Geçersiz istek formatı. 'messages' alanı zorunludur."
+        }), 400
+
+    # 3. OpenRouter isteği
+    model = _get_agent_model(agent_id)
+    or_url = CONFIG["openrouter"]["base_url"]
+
+    headers = {
+        "Authorization":  f"Bearer {api_key}",
+        "HTTP-Referer":   CONFIG["openrouter"]["site_url"],
+        "X-Title":        CONFIG["openrouter"]["site_name"],
+        "Content-Type":   "application/json",
     }
 
-
-def next_api_key():
-    global key_index
-    keys = [
-        key.strip()
-        for key in CONFIG.get("openrouter", {}).get("api_keys", [])
-        if key and not key.startswith("OPENROUTER_API_KEY_")
-    ]
-    if not keys:
-        raise RuntimeError("/etc/anka/config.json icinde gecerli OpenRouter API anahtari yok.")
-
-    with key_lock:
-        key = keys[key_index % len(keys)]
-        key_index += 1
-        return key
-
-
-def clamp_history(history, max_messages=20):
-    if not isinstance(history, list):
-        return []
-
-    clean = []
-    for item in history[-max_messages:]:
-        role = item.get("role")
-        content = item.get("content")
-        if role in {"user", "assistant"} and isinstance(content, str) and content.strip():
-            clean.append({"role": role, "content": content.strip()})
-    return clean
-
-
-def call_openrouter(agent, message, history):
-    openrouter = CONFIG.get("openrouter", {})
     payload = {
-        "model": openrouter.get("model", "openai/gpt-4o"),
-        "messages": [
-            {"role": "system", "content": agent["system_prompt"]},
-            *clamp_history(history),
-            {"role": "user", "content": message},
-        ],
-        "temperature": 0.7,
+        "model":    model,
+        "messages": messages,
     }
 
-    body = json.dumps(payload).encode("utf-8")
-    request = urllib.request.Request(
-        openrouter.get("base_url", FALLBACK_CONFIG["openrouter"]["base_url"]),
-        data=body,
-        method="POST",
-        headers={
-            "Authorization": f"Bearer {next_api_key()}",
-            "Content-Type": "application/json",
-            "HTTP-Referer": openrouter.get("site_url", "http://localhost:7700"),
-            "X-Title": openrouter.get("app_name", "Anka Intelligence OS"),
-        },
-    )
-
     try:
-        with urllib.request.urlopen(request, timeout=90) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        detail = exc.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"OpenRouter HTTP {exc.code}: {detail}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"OpenRouter baglanti hatasi: {exc.reason}") from exc
+        resp = requests.post(or_url, headers=headers, json=payload, timeout=60)
+    except requests.exceptions.Timeout:
+        log.error("OpenRouter isteği zaman aşımına uğradı.")
+        return jsonify({
+            "error": "timeout",
+            "message": "Yapay zeka sunucusuna bağlanılamadı. Lütfen tekrar deneyin."
+        }), 504
+    except requests.exceptions.RequestException as e:
+        log.error(f"OpenRouter bağlantı hatası: {e}")
+        return jsonify({
+            "error": "connection_error",
+            "message": "Sunucuya ulaşılamıyor. Ağ bağlantınızı kontrol edin."
+        }), 503
 
+    # 4. Upstream hata yönetimi
+    if resp.status_code == 401:
+        log.warning(f"OpenRouter 401 — geçersiz key (son 4: ...{api_key[-4:]})")
+        return jsonify({
+            "error": "unauthorized",
+            "message": "Lisans anahtarı geçersiz veya süresi dolmuş."
+        }), 401
+
+    if resp.status_code == 429:
+        log.warning("OpenRouter 429 — rate limit aşıldı.")
+        return jsonify({
+            "error": "rate_limit",
+            "message": "Çok fazla istek gönderildi. Lütfen birkaç saniye bekleyin."
+        }), 429
+
+    if resp.status_code == 402:
+        return jsonify({
+            "error": "quota_exceeded",
+            "message": "Kullanım kotanız doldu. Lütfen hesabınızı kontrol edin."
+        }), 402
+
+    if not resp.ok:
+        log.error(f"OpenRouter {resp.status_code}: {resp.text[:200]}")
+        return jsonify({
+            "error": "upstream_error",
+            "message": f"Yapay zeka servisi hata döndürdü (HTTP {resp.status_code})."
+        }), 500
+
+    # 5. Başarılı yanıt
     try:
-        return data["choices"][0]["message"]["content"]
-    except (KeyError, IndexError, TypeError) as exc:
-        raise RuntimeError(f"OpenRouter beklenmeyen yanit dondurdu: {data}") from exc
+        data = resp.json()
+        content = data["choices"][0]["message"]["content"]
+        return jsonify({"reply": content, "model": model}), 200
+    except (KeyError, IndexError, json.JSONDecodeError) as e:
+        log.error(f"Yanıt parse hatası: {e}")
+        return jsonify({
+            "error": "parse_error",
+            "message": "Yapay zeka yanıtı işlenemedi."
+        }), 500
 
 
-class YonHandler(BaseHTTPRequestHandler):
-    server_version = "AnkaYon/1.0"
-
-    def log_message(self, fmt, *args):
-        logging.info("%s - %s", self.address_string(), fmt % args)
-
-    def end_headers(self):
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
-        super().end_headers()
-
-    def send_json(self, status, payload):
-        data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json; charset=utf-8")
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
-
-    def read_json(self):
-        length = int(self.headers.get("Content-Length", "0"))
-        if length <= 0:
-            return {}
-        return json.loads(self.rfile.read(length).decode("utf-8"))
-
-    def do_OPTIONS(self):
-        self.send_response(204)
-        self.end_headers()
-
-    def do_GET(self):
-        if self.path == "/api/config":
-            self.send_json(200, {"agents": [public_agent(agent) for agent in AGENTS]})
-            return
-
-        if self.path == "/health":
-            self.send_json(200, {"ok": True})
-            return
-
-        self.send_json(404, {"error": "Bulunamadi"})
-
-    def do_POST(self):
-        if self.path != "/api/chat":
-            self.send_json(404, {"error": "Bulunamadi"})
-            return
-
-        try:
-            payload = self.read_json()
-            agent_id = payload.get("agent_id")
-            message = payload.get("message", "").strip()
-            history = payload.get("history", [])
-
-            if agent_id not in AGENT_MAP:
-                self.send_json(400, {"error": "Gecersiz ajan secimi."})
-                return
-            if not message:
-                self.send_json(400, {"error": "Mesaj bos olamaz."})
-                return
-
-            answer = call_openrouter(AGENT_MAP[agent_id], message, history)
-            self.send_json(200, {"answer": answer})
-        except json.JSONDecodeError:
-            self.send_json(400, {"error": "Gecersiz JSON govdesi."})
-        except Exception as exc:
-            logging.exception("Sohbet istegi basarisiz oldu.")
-            self.send_json(500, {"error": str(exc)})
-
-
-def main():
-    server_config = CONFIG.get("server", {})
-    host = server_config.get("host", "127.0.0.1")
-    port = int(server_config.get("port", 7700))
-
-    if not AGENTS:
-        raise SystemExit("agents.json bos veya okunamadi.")
-
-    httpd = ThreadingHTTPServer((host, port), YonHandler)
-    logging.info("Anka YON %s:%s adresinde dinliyor.", host, port)
-    httpd.serve_forever()
-
-
+# ── Entry ─────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    main()
+    srv = CONFIG["server"]
+    log.info(f"Yon Core başlatılıyor: {srv['host']}:{srv['port']}")
+    app.run(
+        host=srv["host"],
+        port=srv["port"],
+        debug=srv.get("debug", False)
+    )

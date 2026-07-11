@@ -1,15 +1,26 @@
-live-boot
-live-config
-systemd
-python3
-ca-certificates
-curl
-chromium
-xserver-xorg-core
-xserver-xorg-input-all
-xserver-xorg-video-all
-xinit
-dbus-x11
+# Anka Intelligence OS - Package List
+# Temel Sistem
+xorg
 openbox
-fonts-dejavu
+nodm
+chromium
+xdotool
+unclutter
+
+# Ağ & Sistem Araçları
+curl
+wget
+net-tools
+ca-certificates
+python3
+python3-pip
+python3-flask
+python3-flask-cors
+
+# Sanal Makine Desteği (VirtualBox)
+virtualbox-guest-x11
+virtualbox-guest-utils
+
+# Yardımcı
+fonts-noto
 fonts-noto-color-emoji

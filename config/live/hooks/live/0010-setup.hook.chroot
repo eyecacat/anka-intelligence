@@ -1,35 +1,33 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
-echo "Anka Intelligence OS kurulumu baslatiliyor..."
+echo "[ANKA] Setup hook başlatılıyor..."
 
-if ! id anka >/dev/null 2>&1; then
-  useradd -m -s /bin/bash -G audio,video,netdev,plugdev anka
+# Dizin yapısını oluştur
+mkdir -p /opt/anka/shell
+mkdir -p /opt/anka/yon
+mkdir -p /etc/anka
+
+# marked.js - CDN'e bağımlı kalmamak için build aşamasında indir
+echo "[ANKA] marked.min.js indiriliyor..."
+wget -q --timeout=30 \
+  "https://cdn.jsdelivr.net/npm/marked/marked.min.js" \
+  -O /opt/anka/shell/marked.min.js \
+  || echo "[ANKA] UYARI: marked.min.js indirilemedi, fallback placeholder oluşturuluyor..."
+
+# Eğer indirme başarısız olduysa minimal stub yaz (offline build senaryosu)
+if [ ! -s /opt/anka/shell/marked.min.js ]; then
+  cat > /opt/anka/shell/marked.min.js << 'STUB'
+// marked.min.js stub - Build sırasında indirilemedi
+// Gerçek kütüphaneyi /opt/anka/shell/marked.min.js konumuna yerleştirin
+window.marked = { parse: function(t) { return t.replace(/\n/g, '<br>'); } };
+STUB
 fi
 
-passwd -d anka || true
+echo "[ANKA] marked.min.js boyutu: $(wc -c < /opt/anka/shell/marked.min.js) byte"
 
-install -d -m 0755 /etc/systemd/system/getty@tty1.service.d
-cat > /etc/systemd/system/getty@tty1.service.d/autologin.conf <<'EOF'
-[Service]
-ExecStart=
-ExecStart=-/sbin/agetty --autologin anka --noclear %I $TERM
-Type=idle
-EOF
+# Dizin izinleri
+chown -R root:root /opt/anka
+chmod -R 755 /opt/anka
 
-install -d -m 0755 /etc/X11
-cat > /etc/X11/Xwrapper.config <<'EOF'
-allowed_users=anybody
-needs_root_rights=yes
-EOF
-
-install -d -o anka -g anka -m 0755 /home/anka/.config/chromium
-chown -R anka:anka /home/anka
-
-chmod 0755 /usr/local/bin/anka-start
-chmod 0755 /opt/anka/yon/yon_core.py
-
-systemctl enable anka-yon.service
-systemctl enable anka-shell.service
-
-echo "Anka Intelligence OS kurulumu tamamlandi."
+echo "[ANKA] Setup hook tamamlandı."
